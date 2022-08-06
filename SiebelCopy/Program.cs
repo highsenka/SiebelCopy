@@ -13,7 +13,7 @@ namespace SiebelCopy
     class Program
     {
         private static int th = 8;
-        private static int olderthanday = 3000;
+        private static int olderthanday = -1;
         private static int i = 0; // счетчик обработанных файлов
         private static int k = 0; // счетчик кол-ва итераций 
         private static int j = 0; // кол-во скопированных файлов
@@ -162,8 +162,8 @@ namespace SiebelCopy
         {
             if (args.Length < 3)
             {
-                Console.WriteLine("Usage: [SiebelRWMove.exe] source_dir[,mirror_dir] destination_dir[,destination_dir[,destination_dir...]] filecount [olderthanday default:30]");
-                Thread.Sleep(10000);
+                Console.WriteLine("Usage: [SiebelRWMove.exe] source_dir[,mirror_dir] destination_dir[,destination_dir[,destination_dir...]] filecount [olderthanday default:-1]");
+                Thread.Sleep(1000);
                 return;
             }
 
@@ -271,13 +271,13 @@ namespace SiebelCopy
                             if (!File.Exists(destFile))
                             {
                                 File.Copy(sourceFile, destFile);
-                                Console.WriteLine("[{2}] File copied: {0} -> {1} ", sourceFile, destFile, DateTime.Now.ToString());
+                                Console.WriteLine("[{3}] [{2}] File copied: {0} -> {1} ", sourceFile, destFile, DateTime.Now.ToString(), (j + 1).ToString());
                                 flag = true;
                             }
                             else if (fileInfo.Length != new FileInfo(destFile).Length)
                             {
                                 File.Copy(sourceFile, destFile, true);
-                                Console.WriteLine("[{2}] File copied: {0} -> {1} ", sourceFile, destFile, DateTime.Now.ToString());
+                                Console.WriteLine("[{3}] [{2}] File copied: {0} -> {1} ", sourceFile, destFile, DateTime.Now.ToString(), (j + 1).ToString());
                                 flag = true;
                             }
                         }
