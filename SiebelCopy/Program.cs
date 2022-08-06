@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
@@ -12,6 +12,12 @@ namespace SiebelCopy
 {
     class Program
     {
+        private static int th = 8;
+        private static int olderthanday = 3000;
+        private static int i = 0; // счетчик обработанных файлов
+        private static int k = 0; // счетчик кол-ва итераций 
+        private static int j = 0; // кол-во скопированных файлов
+
         private static string MakePath(string path)
         {
             return Path.Combine(path, "*");
@@ -157,10 +163,11 @@ namespace SiebelCopy
             if (args.Length < 3)
             {
                 Console.WriteLine("Usage: [SiebelRWMove.exe] source_dir[,mirror_dir] destination_dir[,destination_dir[,destination_dir...]] filecount [olderthanday default:30]");
+                Thread.Sleep(10000);
                 return;
             }
 
-            int filecount, olderthanday = 30;
+            int filecount = 30;
 
             // Проверяем число
 
@@ -193,8 +200,6 @@ namespace SiebelCopy
             }
 
 
-            int tick = 0; // Если процессы бэкапа и перемещения не выполнятся за 1 час, то приложение закроется
-            // Проверяем пути назначения, что существуют
             string[] destination_dirs = args[1].Split(',');
             foreach (string dir in destination_dirs)
             {
@@ -205,112 +210,94 @@ namespace SiebelCopy
                 }
             }
 
-            int i = 0; // счетчик обработанных файлов
-            int k = 1; // счетчик кол-ва итераций 
-            int j = 0; // кол-во скопированных файлов
-
-
-            // Процесс перемещения файлов
             foreach (string file in GetFiles(source_dir))
             {
                 string sourceFile = System.IO.Path.Combine(source_dir, file);
-                FileInfo f1 = new FileInfo(sourceFile);
 
-                // Файлы старше 30 дней
-                if (f1.CreationTime < DateTime.Now.AddDays(-olderthanday))
+                List<string> stringList = new List<string>();
+                // 1-й этап, копируем данные в каждое назначение
+                foreach (string ddir in destination_dirs)
                 {
-                    // 1-й этап, копируем данные в каждое назначение
-                    foreach (string ddir in destination_dirs)
+                    string destFile = System.IO.Path.Combine(ddir, file);
+                    stringList.Add(destFile);
+                }
+                string[] array = stringList.ToArray();
+                bool flag = false;
+                while (!flag)
+                {
+                    if (th > 0)
                     {
-                        string destFile = System.IO.Path.Combine(ddir, file);
+                        flag = true;
+                        th--;
+                        AsyncFileCopier.AsynFileCopy(sourceFile, array);
+                    }
+                }
+                i++;
 
-                        if (!File.Exists(destFile))
+                if (i < filecount)
+                {
+                    if (i % 100 == 0)
+                        Console.WriteLine("Source files processed: " + i.ToString());
+                    if (j % 100 == 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("Files: {0} Skipped: {1}", j.ToString(), k.ToString());
+                        Console.ResetColor();
+                    }
+                }
+                else 
+                {
+                    break;
+                }
+            }
+            Console.WriteLine("Total files: {0} skiped: {1} copied: {2}", i.ToString(), k.ToString(), j.ToString());
+            Thread.Sleep(10000);
+        }
+
+        public class AsyncFileCopier
+        {
+            public static void AsynFileCopy(string sourceFile, string[] destFiles) => new Program.AsyncFileCopier.FileCopyDelegate(Program.AsyncFileCopier.FileCopy).BeginInvoke(sourceFile, destFiles, new AsyncCallback(Program.AsyncFileCopier.CallBackAfterFileCopied), (object)null);
+
+            public static void FileCopy(string sourceFile, string[] destFiles)
+            {
+                try
+                {
+                    bool flag = false;
+                    foreach (string destFile in destFiles)
+                    {
+                        FileInfo fileInfo = new FileInfo(sourceFile);
+                        if (fileInfo.CreationTime < DateTime.Now.AddDays(-olderthanday))
                         {
-                            try
+                            if (!File.Exists(destFile))
                             {
                                 File.Copy(sourceFile, destFile);
                                 Console.WriteLine("[{2}] File copied: {0} -> {1} ", sourceFile, destFile, DateTime.Now.ToString());
-                                j++;
+                                flag = true;
                             }
-                            catch (Exception E)
+                            else if (fileInfo.Length != new FileInfo(destFile).Length)
                             {
-                                Console.WriteLine(E);
+                                File.Copy(sourceFile, destFile, true);
+                                Console.WriteLine("[{2}] File copied: {0} -> {1} ", sourceFile, destFile, DateTime.Now.ToString());
+                                flag = true;
                             }
                         }
-                        else
-                        {
-                            // Перезаписываем если размер разный
-                            if (f1.Length != (new FileInfo(destFile)).Length)
-                                try
-                                {
-                                    File.Copy(sourceFile, destFile, true);
-                                }
-                                catch (Exception E)
-                                {
-                                    Console.WriteLine(E);
-                                }
-                        }
                     }
-
-                    bool iscopyed = false;
-                    // 2-й этап проверяем, что данные скопированы
-                    foreach (string ddir in destination_dirs)
+                    if (!flag)
                     {
-                        string destFile = System.IO.Path.Combine(ddir, file);
-
-                        // Если файла не существует, то прерываем цикл
-                        if (!File.Exists(destFile))
-                        {
-                            Console.WriteLine("[{2}] Files error copy from {0} to {1}: ", source_dir, ddir, DateTime.Now.ToString());
-                            iscopyed = false;
-                            break;
-                        }
-
-                        // Если файл существует и размер равный, ставим триггер, что данные скопированы
-                        if (File.Exists(destFile))
-                            if (f1.Length == (new FileInfo(destFile)).Length)
-                            {
-                                iscopyed = true;
-                            }
+                        k++;
+                        return;
                     }
-
-                    // Если данные скопированы, удаляем файл из источника
-                    if (iscopyed)
-                    {
-                        /*
-                        File.Delete(sourceFile);
-                        if (mirror_dir != null)
-                        {
-                            string mirrorFile = System.IO.Path.Combine(mirror_dir, file);
-                            File.Delete(mirrorFile);
-                            Console.WriteLine("[{1}] File {0} was deleted", mirrorFile, DateTime.Now.ToString());
-                        }
-                        Console.WriteLine("[{1}] File {0} was deleted", sourceFile, DateTime.Now.ToString());
-                        */
-                    }
-
-
-                    i++;
-
-                    if (i >= filecount)
-                    {
-                        break;
-                    }
-
-                    if (i % 100 == 0)
-                        Console.WriteLine("Files processed: " + i.ToString());
+                    j++;
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine("File {0} was fresh {1}", sourceFile, f1.CreationTime.ToString());
+                    Console.WriteLine("Error: " + ex.ToString());
                 }
-
-                if (k % 100 == 0)
-                    Console.WriteLine("Файлов: {0} Пропущено: {1}", k.ToString(), (k - i).ToString());
-
-                k++;
             }
-            Console.WriteLine("Total files: {0} skiped: {1} processed: {2} copied: {3}", k.ToString(), (k - i).ToString(), i.ToString(), (j / ((destination_dirs.Count() == 0) ? 1 : destination_dirs.Count())).ToString());
+
+            public static void CallBackAfterFileCopied(IAsyncResult result) => ++Program.th;
+
+            public delegate void FileCopyDelegate(string sourceFile, string[] destFiles);
         }
     }
 }
