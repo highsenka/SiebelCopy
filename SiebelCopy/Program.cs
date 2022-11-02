@@ -238,7 +238,7 @@ namespace SiebelCopy
                 {
                     if (i % 100 == 0)
                         Console.WriteLine("Source files processed: " + i.ToString());
-                    if (j % 100 == 0)
+                    if ((i + j) % 10000 == 0)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine("Files: {0} Skipped: {1}", j.ToString(), k.ToString());
@@ -250,6 +250,7 @@ namespace SiebelCopy
                     break;
                 }
             }
+            Thread.Sleep(1000);
             Console.WriteLine("Total files: {0} skiped: {1} copied: {2}", i.ToString(), k.ToString(), j.ToString());
             Thread.Sleep(10000);
         }
