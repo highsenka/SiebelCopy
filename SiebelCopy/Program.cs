@@ -12,7 +12,7 @@ namespace SiebelCopy
 {
     class Program
     {
-        private static int th = 8;
+        private static int th = 32;
         private static int olderthanday = -1;
         private static int i = 0; // счетчик обработанных файлов
         private static int k = 0; // счетчик кол-ва итераций 
@@ -162,13 +162,13 @@ namespace SiebelCopy
         {
             if (args.Length < 3)
             {
-                Console.WriteLine("Usage: [SiebelRWMove.exe] source_dir[,mirror_dir] destination_dir[,destination_dir[,destination_dir...]] filecount [olderthanday default:-1]");
+                Console.WriteLine("Usage: [SiebelRWMove.exe] source_dir[,mirror_dir] destination_dir[,destination_dir[,destination_dir...]] filecount [olderthanday default:-1] [skipfiles default:0]");
                 Thread.Sleep(1000);
                 return;
             }
 
             int filecount = 30;
-
+            int skipfiles = 0;
             // Проверяем число
 
             if (!Int32.TryParse(args[2], out filecount))
@@ -186,6 +186,13 @@ namespace SiebelCopy
                     return;
                 }
 
+            if (args.Length >= 5)
+                if (!Int32.TryParse(args[4], out skipfiles))
+                {
+                    Console.WriteLine("Attempted conversion olderthanday of '{0}' failed.",
+                                   args[4] == null ? "<null>" : args[4]);
+                    return;
+                }
 
             // Проверяем директорию-источник
             string[] source_dirs = args[0].Split(',');
@@ -222,6 +229,13 @@ namespace SiebelCopy
                     stringList.Add(destFile);
                 }
                 string[] array = stringList.ToArray();
+
+                if (skipfiles > i)
+                {
+                    i++;
+                    continue;
+                }
+
                 bool flag = false;
                 while (!flag)
                 {
@@ -236,7 +250,7 @@ namespace SiebelCopy
 
                 if (i < filecount)
                 {
-                    if (i % 100 == 0)
+                    if (i % 1000 == 0)
                         Console.WriteLine("Source files processed: " + i.ToString());
                     if ((i + j) % 10000 == 0)
                     {
